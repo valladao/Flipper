@@ -1,0 +1,16 @@
+Project: a Twitter clone using Redis and Express
+The JavaScript Full-Stack Bootcamp
+Flavio Copes
+
+In this module we’re going to create a sample application using Node.js, Express, and Redis as the database.
+
+The pages of our app will be generated server-side, with vanilla JavaScript (no framework) on the client side.
+
+The application, called Flipper, will be a bare-bones clone of Twitter, a popular social network that lets users post messages that other users can see, they can follow and they can be followed.
+
+We’re going to implement the following:
+
+    Signing up to Flipper, creating an account
+    Posting messages
+    We can follow people, and we can have people follow us
+    We can see messages of people we follow
