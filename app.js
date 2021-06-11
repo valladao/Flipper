@@ -1,14 +1,33 @@
 const express = require("express")
 const app = express()
+
 const path = require("path")
+
 const redis = require("redis")
 const client = redis.createClient()
+
 const bcrypt = require("bcrypt")
+const session = require("express-session")
+const RedisStore = require("connect-redis")(session)
 
 app.set("view engine", "pug")
 app.set("views", path.join(__dirname, "views"))
 
 app.use(express.urlencoded({ extended: true }))
+
+app.use(
+  session({
+    store: new RedisStore({ client: client }),
+    resave: true,
+    saveUninitialized: true,
+    cookie: {
+      maxAge: 36000000,
+      httpOnly: false,
+      secure: false,
+    },
+    secret: "avre435dkdi35wj$sx94!7mdpf#d6f*&",
+  })
+)
 
 app.get("/", (req, res) => res.render("index"))
 
