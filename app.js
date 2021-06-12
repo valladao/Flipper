@@ -29,9 +29,21 @@ app.use(
   })
 )
 
-app.get("/", (req, res) => res.render("index"))
+app.get("/", (req, res) => {
+  if (req.session.userid) {
+    res.render("dashboard")
+  } else {
+    res.render("login")
+  }
+})
 
 app.post("/", (req, res) => {
+  const saveSessionAndRenderDashboard = (userid) => {
+    req.session.userid = userid
+    req.session.save()
+    res.render("dashboard")
+  }
+
   const { username, password } = req.body
 
   if (!username || !password) {
@@ -51,6 +63,7 @@ app.post("/", (req, res) => {
         const saltRounds = 10
         const hash = await bcrypt.hash(password, saltRounds)
         client.hset(`user:${userid}`, "hash", hash, "username", username)
+        saveSessionAndRenderDashboard(userid)
       })
     } else {
       //user exists, login procedure
@@ -58,14 +71,17 @@ app.post("/", (req, res) => {
         const result = await bcrypt.compare(password, hash)
         if (result) {
           //password ok
+          saveSessionAndRenderDashboard(userid)
         } else {
           //wrong password
+          res.render("error", {
+            message: "Incorrect password",
+          })
+          return
         }
       })
     }
   })
-
-  res.end()
 })
 
 app.listen(3000, () => console.log("Server ready"))
