@@ -45,12 +45,6 @@ app.get("/", (req, res) => {
         })
       }
     )
-
-    client.hkeys("users", (err, users) => {
-      res.render("dashboard", {
-        users,
-      })
-    })
   } else {
     res.render("login")
   }
