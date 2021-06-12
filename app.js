@@ -3,6 +3,7 @@ const path = require("path")
 const redis = require("redis")
 const bcrypt = require("bcrypt")
 const session = require("express-session")
+const { promisify } = require("util")
 
 const app = express()
 const client = redis.createClient()
@@ -27,24 +28,29 @@ app.use(
   })
 )
 
-app.get("/", (req, res) => {
+// Promisify client | Redis functions
+const ahget = promisify(client.hget).bind(client)
+const asmembers = promisify(client.smembers).bind(client)
+const ahkeys = promisify(client.hkeys).bind(client)
+const aincr = promisify(client.incr).bind(client)
+const alrange = promisify(client.lrange).bind(client)
+
+app.get("/", async (req, res) => {
   if (req.session.userid) {
-    client.hget(
+    const currentUserName = await ahget(
       `user:${req.session.userid}`,
-      "username",
-      (err, currentUserName) => {
-        client.smembers(`following:${currentUserName}`, (err, following) => {
-          client.hkeys("users", (err, users) => {
-            res.render("dashboard", {
-              users: users.filter(
-                (user) =>
-                  user !== currentUserName && following.indexOf(user) === -1
-              ),
-            })
-          })
-        })
-      }
+      "username"
     )
+
+    const following = await asmembers(`following:${currentUserName}`)
+
+    const users = await ahkeys("users")
+
+    res.render("dashboard", {
+      users: users.filter(
+        (user) => user !== currentUserName && following.indexOf(user) === -1
+      ),
+    })
   } else {
     res.render("login")
   }
