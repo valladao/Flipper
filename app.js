@@ -4,6 +4,7 @@ const redis = require("redis")
 const bcrypt = require("bcrypt")
 const session = require("express-session")
 const { promisify } = require("util")
+const { formatDistance } = require("date-fns")
 
 const app = express()
 const client = redis.createClient()
@@ -46,10 +47,30 @@ app.get("/", async (req, res) => {
 
     const users = await ahkeys("users")
 
+    const timeline = []
+
+    const posts = await alrange(`timeline:${currentUserName}`, 0, 100)
+
+    for (post of posts) {
+      const timestamp = await ahget(`post:${post}`, "timestamp")
+      const timeString = formatDistance(
+        new Date(),
+        new Date(parseInt(timestamp))
+      )
+
+      timeline.push({
+        message: await ahget(`post:${post}`, "message"),
+        author: await ahget(`post:${post}`, "username"),
+        timeString: timeString,
+      })
+    }
+
     res.render("dashboard", {
       users: users.filter(
         (user) => user !== currentUserName && following.indexOf(user) === -1
       ),
+      currentUserName,
+      timeline,
     })
   } else {
     res.render("login")
@@ -119,7 +140,7 @@ app.post("/", (req, res) => {
   })
 })
 
-app.post("/post", (req, res) => {
+app.post("/post", async (req, res) => {
   if (!req.session.userid) {
     res.render("login")
     return
@@ -127,20 +148,30 @@ app.post("/post", (req, res) => {
 
   const { message } = req.body
 
-  client.incr("postid", async (err, postid) => {
-    client.hmset(
-      `post:${postid}`,
-      "userid",
-      req.session.userid,
-      "message",
-      message,
-      "timestamp",
-      Date.now()
-    )
-    client.hkeys("users", (err, users) => {
-      res.redirect("/")
-    })
-  })
+  const currentUserName = await ahget(`user:${req.session.userid}`, "username")
+  const postid = await aincr("postid")
+
+  client.hmset(
+    `post:${postid}`,
+    "userid",
+    req.session.userid,
+    "username",
+    currentUserName,
+    "message",
+    message,
+    "timestamp",
+    Date.now()
+  )
+
+  client.lpush(`timeline:${currentUserName}`, postid)
+
+  const followers = await asmembers(`followers:${currentUserName}`)
+
+  for (follower of followers) {
+    client.lpush(`timeline:${follower}`, postid)
+  }
+
+  res.redirect("/")
 })
 
 app.post("/follow", (req, res) => {
