@@ -29,7 +29,28 @@ app.use(
 
 app.get("/", (req, res) => {
   if (req.session.userid) {
-    res.render("dashboard")
+    client.hget(
+      `user:${req.session.userid}`,
+      "username",
+      (err, currentUserName) => {
+        client.smembers(`following:${currentUserName}`, (err, following) => {
+          client.hkeys("users", (err, users) => {
+            res.render("dashboard", {
+              users: users.filter(
+                (user) =>
+                  user !== currentUserName && following.indexOf(user) === -1
+              ),
+            })
+          })
+        })
+      }
+    )
+
+    client.hkeys("users", (err, users) => {
+      res.render("dashboard", {
+        users,
+      })
+    })
   } else {
     res.render("login")
   }
@@ -56,7 +77,9 @@ app.post("/", (req, res) => {
   const saveSessionAndRenderDashboard = (userid) => {
     req.session.userid = userid
     req.session.save()
-    res.render("dashboard")
+    client.hkeys("users", (err, users) => {
+      res.redirect("/")
+    })
   }
 
   const handleSignup = (username, password) => {
@@ -114,8 +137,30 @@ app.post("/post", (req, res) => {
       "timestamp",
       Date.now()
     )
-    res.render("dashboard")
+    client.hkeys("users", (err, users) => {
+      res.redirect("/")
+    })
   })
+})
+
+app.post("/follow", (req, res) => {
+  if (!req.session.userid) {
+    res.render("login")
+    return
+  }
+
+  const { username } = req.body
+
+  client.hget(
+    `user:${req.session.userid}`,
+    "username",
+    (err, currentUserName) => {
+      client.sadd(`following:${currentUserName}`, username)
+      client.sadd(`followers:${username}`, currentUserName)
+    }
+  )
+
+  res.redirect("/")
 })
 
 app.listen(3000, () => console.log("Server ready"))
